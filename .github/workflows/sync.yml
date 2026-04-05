@@ -1,0 +1,54 @@
+name: Sync Plugin Versions
+
+# Run automatically every 6 hours, or trigger manually from the Actions tab.
+# Reads the AssemblyVersion from each plugin's latest release zip and updates
+# repo.json so Dalamud always shows the correct "update available" state.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync CountdownHide
+        run: |
+          wget -q https://github.com/VimaFFXIV/CountdownHide/releases/latest/download/latest.zip \
+               -O /tmp/CountdownHide.zip
+          unzip -q /tmp/CountdownHide.zip CountdownHide.json -d /tmp/CountdownHide
+          VERSION=$(jq -r '.AssemblyVersion' /tmp/CountdownHide/CountdownHide.json)
+          echo "CountdownHide → $VERSION"
+          NOW=$(date +%s)
+          jq --arg v "$VERSION" --argjson t "$NOW" \
+            '(.[] | select(.InternalName == "CountdownHide")) |= (.AssemblyVersion = $v | .LastUpdate = $t)' \
+            repo.json > repo.tmp && mv repo.tmp repo.json
+
+      - name: Sync MacroVault
+        run: |
+          wget -q https://github.com/VimaFFXIV/MacroVault/releases/latest/download/latest.zip \
+               -O /tmp/MacroVault.zip
+          unzip -q /tmp/MacroVault.zip MacroVault.json -d /tmp/MacroVault
+          VERSION=$(jq -r '.AssemblyVersion' /tmp/MacroVault/MacroVault.json)
+          echo "MacroVault → $VERSION"
+          NOW=$(date +%s)
+          jq --arg v "$VERSION" --argjson t "$NOW" \
+            '(.[] | select(.InternalName == "MacroVault")) |= (.AssemblyVersion = $v | .LastUpdate = $t)' \
+            repo.json > repo.tmp && mv repo.tmp repo.json
+
+      - name: Commit if versions changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet repo.json && echo "No version changes." || \
+            (git add repo.json && \
+             git commit -m "Sync plugin versions [skip ci]" && \
+             git push)
