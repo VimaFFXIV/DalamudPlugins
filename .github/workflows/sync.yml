@@ -44,6 +44,18 @@ jobs:
             '(.[] | select(.InternalName == "MacroVault")) |= (.AssemblyVersion = $v | .LastUpdate = $t)' \
             repo.json > repo.tmp && mv repo.tmp repo.json
 
+      - name: Sync SharkChat
+        run: |
+          wget -q https://github.com/VimaFFXIV/SharkChat/releases/latest/download/latest.zip \
+               -O /tmp/SharkChat.zip
+          unzip -q /tmp/SharkChat.zip SharkChat.json -d /tmp/SharkChat
+          VERSION=$(jq -r '.AssemblyVersion' /tmp/SharkChat/SharkChat.json)
+          echo "SharkChat → $VERSION"
+          NOW=$(date +%s)
+          jq --arg v "$VERSION" --argjson t "$NOW" \
+            '(.[] | select(.InternalName == "SharkChat")) |= (.AssemblyVersion = $v | .LastUpdate = $t)' \
+            repo.json > repo.tmp && mv repo.tmp repo.json
+
       - name: Commit if versions changed
         run: |
           git config user.name "github-actions[bot]"
